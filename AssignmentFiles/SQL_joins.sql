@@ -20,13 +20,18 @@ INNER JOIN categories
 SELECT
 	orders.order_id, 
     orders.order_datetime, 
-    orders.store_id, 
-    orders.product_id, 
-    orders.quantity,
-    (orders.quantity * products.price) AS line_total
+    stores.name AS store_name, 
+    products.name AS store_name, 
+    order_items.quantity,
+    (order_items.quantity * products.price) AS line_total
 FROM orders
-LEFT JOIN products
-	ON orders.product_id = products.product_id;
+INNER JOIN stores
+	ON orders.store_id = stores.store_id
+INNER JOIN order_items
+	ON orders.order_id = order_items.order_id
+INNER JOIN products
+	ON order_items.product_id = products.product_id
+ORDER BY orders.order_datetime DESC;
 
 -- Q3) Customer order history (PAID only):
 --     For each order, show customer_name, store_name, order_datetime,
@@ -100,17 +105,78 @@ INNER JOIN products
 	ON inventory.product_id = products.product_id
 INNER JOIN stores
 	ON inventory.store_id = stores.store_id
-WHERE inventory.on_hand < 12
+WHERE inventory.on_hand < 12;
 
 -- Q7) Manager roster: list each store's manager_name and hire_date.
 --     (Assume title = 'Manager').
 
+SELECT
+	employees.first_name,
+    employees.last_name,
+    employees.hire_date,
+    stores.name AS store_name
+FROM employees
+LEFT JOIN stores
+	ON employees.store_id = stores.store_id
+WHERE title='Manager'
+ORDER BY hire_date DESC;
+
 -- Q8) Using a subquery/CTE: list products whose total PAID revenue is above
 --     the average PAID product revenue. Return product_name, total_revenue.
+
+WITH computation AS (
+SELECT
+	products.name AS product_name,
+	SUM(order_items.quantity * products.price) AS total_revenue
+FROM products
+INNER JOIN order_items
+	ON products.product_id = order_items.product_id
+INNER JOIN orders
+	ON order_items.order_id = orders.order_id
+WHERE status='paid'
+GROUP BY products.product_id
+)
+SELECT *
+FROM computation	
+HAVING total_revenue > (SELECT AVG(total_revenue)FROM computation);
 
 -- Q9) Churn-ish check: list customers with their last PAID order date.
 --     If they have no PAID orders, show NULL.
 --     Hint: Put the status filter in the LEFT JOIN's ON clause to preserve non-buyer rows.
 
+SELECT 
+	customers.first_name AS first_name,
+    customers.last_name AS last_name,
+    DATE(orders.order_datetime) AS order_date
+FROM customers
+LEFT JOIN orders
+	ON customers.customer_id = orders.customer_id 
+WHERE orders.status='paid';
+
 -- Q10) Product mix report (PAID only):
 --     For each store and category, show total units and total revenue (= SUM(quantity * products.price)).
+
+SELECT 
+	stores.name AS store_name,
+    categories.name AS category_name,
+	SUM(order_items.quantity) AS quantity,
+    SUM(order_items.quantity * products.price) AS total_revenue
+FROM order_items
+INNER JOIN orders
+	ON order_items.order_id = orders.order_id
+LEFT JOIN products
+	ON order_items.product_id = products.product_id
+INNER JOIN stores
+	ON stores.store_id = orders.store_id
+INNER JOIN categories
+	ON products.category_id = categories.category_id
+WHERE orders.status='paid'
+GROUP BY store_name, category_name;
+	
+    
+    
+    
+    
+    
+    
+    
